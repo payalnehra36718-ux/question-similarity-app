@@ -14,9 +14,13 @@ st.markdown("""
     background-color: #f0f2f6;
 }
 .title {
-    text-align: center;
+    font-size: 32px;
+    font-weight: bold;
     color: #4CAF50;
-    font-size: 40px;
+}
+button {
+    border-radius: 8px !important;
+    height: 40px;
 }
 </style>
 """, unsafe_allow_html=True)
@@ -24,14 +28,12 @@ st.markdown("""
 # ---------------- SESSION ----------------
 if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
-
 if "show_login" not in st.session_state:
     st.session_state.show_login = False
-
 if "show_signup" not in st.session_state:
     st.session_state.show_signup = False
 
-# ---------------- USER FILE ----------------
+# ---------------- USER STORAGE ----------------
 USER_FILE = "users.csv"
 
 if not os.path.exists(USER_FILE):
@@ -49,8 +51,11 @@ def check_user(email, password):
     df = load_users()
     return ((df["email"] == email) & (df["password"] == password)).any()
 
-# ---------------- TOP BAR ----------------
-col1, col2, col3 = st.columns([6, 1, 1])
+# ---------------- TOP NAVBAR ----------------
+col1, col2, col3 = st.columns([8, 1, 1])
+
+with col1:
+    st.markdown('<div class="title">🤖 Question Similarity Checker</div>', unsafe_allow_html=True)
 
 with col2:
     if st.button("Login"):
@@ -62,20 +67,21 @@ with col3:
         st.session_state.show_signup = True
         st.session_state.show_login = False
 
-# ---------------- LOGIN FORM ----------------
+# ---------------- LOGIN ----------------
 if st.session_state.show_login:
     st.subheader("🔐 Login")
     email = st.text_input("Email", key="login_email")
     password = st.text_input("Password", type="password", key="login_pass")
 
-    if st.button("Submit Login"):
+    if st.button("Login Now"):
         if check_user(email, password):
             st.session_state.logged_in = True
             st.success("Logged in successfully ✅")
+            st.session_state.show_login = False
         else:
             st.error("Invalid credentials ❌")
 
-# ---------------- SIGNUP FORM ----------------
+# ---------------- SIGNUP ----------------
 if st.session_state.show_signup:
     st.subheader("📝 Sign Up")
     email = st.text_input("Email", key="signup_email")
@@ -85,17 +91,16 @@ if st.session_state.show_signup:
         if email and password:
             save_user(email, password)
             st.success("Account created! Now login.")
+            st.session_state.show_signup = False
         else:
             st.warning("Enter email & password")
-
-# ---------------- TITLE ----------------
-st.markdown('<div class="title">🤖 Question Similarity Checker</div>', unsafe_allow_html=True)
-st.markdown("### Compare two questions using AI embeddings")
 
 # ---------------- MODEL ----------------
 model = SentenceTransformer('all-mpnet-base-v2')
 
 # ---------------- INPUT ----------------
+st.markdown("### Compare two questions using AI embeddings")
+
 q1 = st.text_area("Enter Question 1")
 q2 = st.text_area("Enter Question 2")
 
