@@ -5,11 +5,31 @@ from sklearn.metrics.pairwise import cosine_similarity
 import os
 
 # ---------------- CONFIG ----------------
-st.set_page_config(page_title="AI Similarity App", page_icon="🤖")
+st.set_page_config(page_title="AI Similarity App", page_icon="🤖", layout="wide")
+
+# ---------------- STYLE ----------------
+st.markdown("""
+<style>
+.main {
+    background-color: #f0f2f6;
+}
+.title {
+    text-align: center;
+    color: #4CAF50;
+    font-size: 40px;
+}
+</style>
+""", unsafe_allow_html=True)
 
 # ---------------- SESSION ----------------
 if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
+
+if "show_login" not in st.session_state:
+    st.session_state.show_login = False
+
+if "show_signup" not in st.session_state:
+    st.session_state.show_signup = False
 
 # ---------------- USER FILE ----------------
 USER_FILE = "users.csv"
@@ -29,47 +49,61 @@ def check_user(email, password):
     df = load_users()
     return ((df["email"] == email) & (df["password"] == password)).any()
 
-# ---------------- SIDEBAR AUTH ----------------
-st.sidebar.title("🔐 Authentication")
+# ---------------- TOP BAR ----------------
+col1, col2, col3 = st.columns([6, 1, 1])
 
-menu = st.sidebar.selectbox("Choose", ["Login", "Sign Up"])
+with col2:
+    if st.button("Login"):
+        st.session_state.show_login = True
+        st.session_state.show_signup = False
 
-email = st.sidebar.text_input("Email")
-password = st.sidebar.text_input("Password", type="password")
+with col3:
+    if st.button("Sign Up"):
+        st.session_state.show_signup = True
+        st.session_state.show_login = False
 
-if menu == "Sign Up":
-    if st.sidebar.button("Create Account"):
-        if email and password:
-            save_user(email, password)
-            st.sidebar.success("Account created! Now login.")
-        else:
-            st.sidebar.warning("Enter email & password")
+# ---------------- LOGIN FORM ----------------
+if st.session_state.show_login:
+    st.subheader("🔐 Login")
+    email = st.text_input("Email", key="login_email")
+    password = st.text_input("Password", type="password", key="login_pass")
 
-elif menu == "Login":
-    if st.sidebar.button("Login"):
+    if st.button("Submit Login"):
         if check_user(email, password):
             st.session_state.logged_in = True
-            st.sidebar.success("Logged in successfully ✅")
+            st.success("Logged in successfully ✅")
         else:
-            st.sidebar.error("Invalid credentials ❌")
+            st.error("Invalid credentials ❌")
 
-# ---------------- UI ----------------
-st.title("🤖 Question Similarity Checker")
-st.markdown("Compare two questions using AI embeddings")
+# ---------------- SIGNUP FORM ----------------
+if st.session_state.show_signup:
+    st.subheader("📝 Sign Up")
+    email = st.text_input("Email", key="signup_email")
+    password = st.text_input("Password", type="password", key="signup_pass")
 
-# Load model
+    if st.button("Create Account"):
+        if email and password:
+            save_user(email, password)
+            st.success("Account created! Now login.")
+        else:
+            st.warning("Enter email & password")
+
+# ---------------- TITLE ----------------
+st.markdown('<div class="title">🤖 Question Similarity Checker</div>', unsafe_allow_html=True)
+st.markdown("### Compare two questions using AI embeddings")
+
+# ---------------- MODEL ----------------
 model = SentenceTransformer('all-mpnet-base-v2')
 
-# Inputs
+# ---------------- INPUT ----------------
 q1 = st.text_area("Enter Question 1")
 q2 = st.text_area("Enter Question 2")
 
-# Example
 if st.button("Try Example"):
     q1 = "What is AI?"
     q2 = "Explain artificial intelligence"
 
-# Main logic
+# ---------------- MAIN FUNCTION ----------------
 if st.button("Check Similarity"):
     if not st.session_state.logged_in:
         st.error("Please login first 🔒")
@@ -95,7 +129,7 @@ if st.button("Check Similarity"):
         else:
             st.warning("Enter both questions")
 
-# ---------------- LIMITATIONS ----------------
+# ---------------- FOOTER ----------------
 st.markdown("### Limitations")
 st.write("""
 - Uses pretrained model (not fine-tuned)
