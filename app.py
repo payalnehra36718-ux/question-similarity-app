@@ -1,101 +1,103 @@
 import streamlit as st
+import pandas as pd
 from sentence_transformers import SentenceTransformer
 from sklearn.metrics.pairwise import cosine_similarity
-import pandas as pd
+import os
 
-# Page config
-st.set_page_config(page_title="AI Similarity App", page_icon="🤖", layout="centered")
+# ---------------- CONFIG ----------------
+st.set_page_config(page_title="AI Similarity App", page_icon="🤖")
 
-# Styling
-st.markdown("""
-    <style>
-    .main {
-        background-color: #f5f7fa;
-    }
-    </style>
-""", unsafe_allow_html=True)
+# ---------------- SESSION ----------------
+if "logged_in" not in st.session_state:
+    st.session_state.logged_in = False
 
-# Sidebar Login
-st.sidebar.title("🔐 Login")
-username = st.sidebar.text_input("Username")
+# ---------------- USER FILE ----------------
+USER_FILE = "users.csv"
+
+if not os.path.exists(USER_FILE):
+    pd.DataFrame(columns=["email", "password"]).to_csv(USER_FILE, index=False)
+
+def load_users():
+    return pd.read_csv(USER_FILE)
+
+def save_user(email, password):
+    df = load_users()
+    df.loc[len(df)] = [email, password]
+    df.to_csv(USER_FILE, index=False)
+
+def check_user(email, password):
+    df = load_users()
+    return ((df["email"] == email) & (df["password"] == password)).any()
+
+# ---------------- SIDEBAR AUTH ----------------
+st.sidebar.title("🔐 Authentication")
+
+menu = st.sidebar.selectbox("Choose", ["Login", "Sign Up"])
+
+email = st.sidebar.text_input("Email")
 password = st.sidebar.text_input("Password", type="password")
 
-logged_in = False
-if username == "admin" and password == "1234":
-    logged_in = True
-else:
-    st.sidebar.warning("Login to unlock features")
+if menu == "Sign Up":
+    if st.sidebar.button("Create Account"):
+        if email and password:
+            save_user(email, password)
+            st.sidebar.success("Account created! Now login.")
+        else:
+            st.sidebar.warning("Enter email & password")
 
-# Title
-st.markdown("<h1 style='text-align: center; color: #4CAF50;'>🤖 Question Similarity Checker</h1>", unsafe_allow_html=True)
-st.markdown("### Compare two questions using AI embeddings")
+elif menu == "Login":
+    if st.sidebar.button("Login"):
+        if check_user(email, password):
+            st.session_state.logged_in = True
+            st.sidebar.success("Logged in successfully ✅")
+        else:
+            st.sidebar.error("Invalid credentials ❌")
+
+# ---------------- UI ----------------
+st.title("🤖 Question Similarity Checker")
+st.markdown("Compare two questions using AI embeddings")
 
 # Load model
 model = SentenceTransformer('all-mpnet-base-v2')
 
-# Inputs (always visible)
+# Inputs
 q1 = st.text_area("Enter Question 1")
 q2 = st.text_area("Enter Question 2")
 
-# Example button
+# Example
 if st.button("Try Example"):
     q1 = "What is AI?"
     q2 = "Explain artificial intelligence"
 
-# Main action
+# Main logic
 if st.button("Check Similarity"):
-    if not logged_in:
-        st.error("Please login first to use this feature")
+    if not st.session_state.logged_in:
+        st.error("Please login first 🔒")
     else:
         if q1 and q2:
-            if len(q1.split()) < 2 or len(q2.split()) < 2:
-                st.warning("Please enter meaningful questions")
+            emb1 = model.encode([q1])
+            emb2 = model.encode([q2])
+
+            sim = cosine_similarity(emb1, emb2)[0][0]
+
+            st.subheader("Result")
+            st.write(f"Similarity Score: {sim:.2f}")
+            st.progress(int(sim * 100))
+
+            if sim > 0.85:
+                st.success("Highly Similar ✅")
+            elif sim > 0.7:
+                st.info("Similar ℹ️")
+            elif sim > 0.5:
+                st.warning("Somewhat related ⚠️")
             else:
-                emb1 = model.encode([q1])
-                emb2 = model.encode([q2])
-
-                sim = cosine_similarity(emb1, emb2)[0][0]
-
-                st.subheader("Result")
-                st.write(f"Similarity Score: {sim:.2f}")
-                st.progress(int(sim * 100))
-
-                if sim > 0.85:
-                    st.success("Highly Similar (Almost duplicate) ✅")
-                elif sim > 0.7:
-                    st.info("Similar meaning ℹ️")
-                elif sim > 0.5:
-                    st.warning("Somewhat related ⚠️")
-                else:
-                    st.error("Different questions ❌")
-
-                # Save history
-                log = pd.DataFrame([[q1, q2, sim]], columns=["Q1","Q2","Score"])
-                log.to_csv("history.csv", mode='a', header=False, index=False)
-
-                st.caption("Similarity computed using Sentence-BERT embeddings")
+                st.error("Not Similar ❌")
         else:
-            st.warning("Please enter both questions")
+            st.warning("Enter both questions")
 
-# Show history
-if st.checkbox("Show History"):
-    if logged_in:
-        try:
-            history = pd.read_csv("history.csv")
-            st.write(history)
-        except:
-            st.write("No history yet")
-    else:
-        st.warning("Login to view history")
-
-# Clear button
-if st.button("Clear Inputs"):
-    st.rerun()
-
-# Limitations
+# ---------------- LIMITATIONS ----------------
 st.markdown("### Limitations")
 st.write("""
-- May misclassify partially related questions  
-- Sensitive to wording similarity  
-- Not fine-tuned on domain-specific data  
+- Uses pretrained model (not fine-tuned)
+- May misclassify partially related queries
 """)
